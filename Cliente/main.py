@@ -4,6 +4,7 @@ from datetime import date
 import socket
 import sys
 import threading
+import logging
 
 class Socket:
   __ipServidor, __portaServidor, __clientSocket, __minhaPorta = None, None, None, None
@@ -93,6 +94,14 @@ class Status():
   def igetEstado(self):
     return self.__estado
 
+class Thread(threading.Thread):
+  def run(self):
+    while self.running:
+      self.function()
+
+  def stop(self):
+    self.running = False
+
   
 def listarUsuarios(usuario, udpSocket):
   print ("\tUsuários Online")
@@ -102,7 +111,7 @@ def listarUsuarios(usuario, udpSocket):
     print(i)
   
 def finalizar():
-  print ("Finalizar")
+  print ("Finalizando...")
   sys.exit()
   
 def cadastrarUsuario(usuario, senha, udpSocket):
@@ -198,11 +207,8 @@ def validarCampoLogin(x):
     return False
   return True
 
-def logout(usuario):
-  try:
-    enviarMensagem('LOGOUT[=|=]%s' % (usuario))
-  except: pass
-
+def logout(usuario, socket):
+  enviarMensagem(('LOGOUT[=|=]%s' % (usuario)).encode(), socket)
 
 def login(udpSocket):
   print("Primeiro acesso? Insira NEW para começar")
@@ -222,15 +228,17 @@ def interceptarMensagens(estado, porta, ipServidor):
 
   arquivo = open('msg-box.txt', 'a+')
   s = Socket(None, None, porta)
-    
-  while True:
+  s.getClientSocket().bind(('', porta))
+  s.getClientSocket().settimeout(3)
+  
+  t = threading.currentThread()  
+  while (getattr(t, "do_run", True)):
     try:
-      s.getClientSocket().bind(('', porta))
       mensagem, remetente = s.getClientSocket().recvfrom(2048)
       
       #Recebeu uma verificação de atividade do servidor, envia resposta
-      if(rementente[1] == ipServidor and mensagem.decode() == 'CHECK'):
-        s.getClientSocket().sendto('OK', (ipServidor, ''))
+      if(rementente[1] == ipServidor and mensagem.decode() == 'CHECK'):       
+        s.getClientSocket().sendto('OK', (ipServidor, ''))       
       
       #Usuário está na conversa com o remetente?
       elif(1>20):#if(estado.getEstado()):
@@ -238,7 +246,7 @@ def interceptarMensagens(estado, porta, ipServidor):
         '''mostrarMensagem(mensagem, remetente)'''
         pass
       else:
-        print()      
+        print() 
         #Se não, salva na caixa de mensagem para mostrar posteriormente
         '''arquivarMensagem(mensagem, remetente)'''
         
@@ -247,13 +255,6 @@ def interceptarMensagens(estado, porta, ipServidor):
       
         
 def chat(udpSocket, usuario, estado):
-  #Cria uma thread que capta mensagens endereçadas para o cliente
-  chatThread = threading.Thread(target=interceptarMensagens, args=(estado, udpSocket.getMinhaPorta(), udpSocket.getIpServidor()))
-  chatThread.start()
-  
-  #checkThread = threading.Thread(threading.Thread(target=verificacaoDeAtividade, args=(udpSocket.getIpServidor())))
-  #checkThread.start()
-  
   hostIP = '127.0.0.1' #Na verdade nao precisa disso
   udpSocket.getClientSocket().settimeout(5)
   data = date.today().strftime('%d/%m/%Y %H:%M')
@@ -272,23 +273,44 @@ def chat(udpSocket, usuario, estado):
     elif (comando == 'OFF'):
       finalizar()
   
-    #INSERIR AQUI UM COMANDO PARA LIMPAR A TELA
+   #INSERIR AQUI UM COMANDO PARA LIMPAR A TELA
 
-#print('ULTIMA MODIFICACAO: VERIFICAR APELIDO DO USUARIO FUNCIONANDO 07/06')
-try:
-  udpSocket = lerArquivoDeConfiguracao()
-  estado = Status()
-  usuario = login(udpSocket)
-  chat(udpSocket, usuario, estado)
-
-except ConnectionResetError:
-  print("\nSEM CONEXAO:Parece que o servidor está com problemas!\nO programa não pôde prosseguir e foi interrompido.")
-  sys.exit(-2)
-except KeyboardInterrupt:
-  print("Chat finalizado!")
-
-finally:
+def main():
   try:
-    logout(usuario, udpSocket)
-  except:
-    pass
+    #Obtendo um objeto Socket que é formado pelos prâmentros do arquivo de configuração
+    udpSocket = lerArquivoDeConfiguracao()
+    
+    #Instancia um objeto Status que será usado no chat
+    estado = Status()
+    
+    #Cria uma thread que capta mensagens endereçadas para o cliente
+    chatThread = threading.Thread(target=interceptarMensagens, args=(estado, udpSocket.getMinhaPorta(), udpSocket.getIpServidor()))
+    chatThread.start()
+  
+    #Cria uma thread que responde as checagens periodicas do servidor
+    #checkThread = threading.Thread(threading.Thread(target=verificacaoDeAtividade, args=(udpSocket.getIpServidor())))
+    #checkThread.start()    
+    
+    #Exibe o login ao  usuario, logo começa o programa de fato
+    usuario = login(udpSocket)
+    chat(udpSocket, usuario, estado)
+  
+  except ConnectionResetError:
+    print("\nSEM CONEXAO:Parece que o servidor está com problemas!\nO programa não pôde prosseguir e foi interrompido.")
+    sys.exit(-2)
+  except KeyboardInterrupt:
+    print("Chat finalizado!")
+  finally:
+    chatThread.do_run = False
+    chatThread.join()
+    try:
+      logout(usuario, udpSocket)
+    except Exception as e:
+      logging.fatal(e, exc_info=True)
+      pass
+    return 0
+
+
+if __name__== "__main__":
+  main()
+  sys.exit()

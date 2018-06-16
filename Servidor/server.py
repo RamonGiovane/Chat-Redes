@@ -113,7 +113,7 @@ def deslogarUsuario(arquivo, linha, usuario):
   #Se o arquivo não estiver previamente aberto, será aberto e será identificado no texto o usuário solicitado
   if(arquivo == None):
     try:
-      arquivo = open('user-status.dbf', 'r+') #mudar o .txt
+      arquivo = open('user-status.dbf', 'r+')
       texto = arquivo.readlines()
       
       for linhas in texto:
@@ -121,9 +121,9 @@ def deslogarUsuario(arquivo, linha, usuario):
           linha = linhas
           break
         
-    except IOError:
-        print('Um erro ocorreu')
-        return
+    except IOError as e:
+      print(e)
+      return
     
   if linha != None:
     for i in linha:
@@ -150,17 +150,18 @@ def listarOnline(usuario,serverSocket, ipCliente):
     #Obtendo os usuarios presente no arquivo de usuarios online
     if(arquivo != None):
       texto = arquivo.readlines()
-      if (texto != ''):
-        for linha in texto:
-          if linha.split(':')[0] != usuario:
-            #Insere na variavel de resposta <apelido(usuario)> - <ip> de cada pessoa online
-            #resposta = resposta + str('%s - %s\n' % (linha.split(':')[0], linha.split(':')[1]))
-            serverSocket.sendto(('%s - %s\n' % (linha.split(':')[0], linha.split(':')[1])).encode(), (ipCliente))
-            print(resposta)
-        serverSocket.sendto(('END').encode(), (ipCliente))
-    arquivo.close()
+      for linha in texto:
+        if linha != '' and linha.split(':')[0] != usuario:
+          #Insere na variavel de resposta <apelido(usuario)> - <ip> de cada pessoa online
+          #resposta = resposta + str('%s - %s\n' % (linha.split(':')[0], linha.split(':')[1]))
+          serverSocket.sendto(('%s - %s\n' % (linha.split(':')[0], linha.split(':')[1])).encode(), (ipCliente))
+          print(resposta)
+      
+      arquivo.close()
   except IOError:
     pass
+  finally:
+    serverSocket.sendto(('END').encode(), (ipCliente))
   print(resposta)
   return resposta
     
@@ -207,6 +208,10 @@ def interpretarComando(s):
         #Salva o novo usuário nos arquivos
         resposta = (cadastrarUsuario(usuario, senha))
         serverSocket.sendto(resposta.encode(), (ipCliente))
+      
+      elif(comando == 'LOGOUT'):
+        deslogarUsuario(None, None, usuario)
+        serverSocket.sendto('TRUE'.encode(), (ipCliente))
 
   except Exception as e:
     print('Um erro ocorreu')
