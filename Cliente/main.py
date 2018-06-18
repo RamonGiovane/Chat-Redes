@@ -67,8 +67,8 @@ class Status():
   
   #Status ativo = usuário está com o chat aberto pronto para receber mensagens diretamente
   #Status inativo = usuário não está com a conversa aberta para receber mensagens
-  ATIVO, INATIVO = 'sd', 'ds'
-  __ipDest, __ipRemt, __estado = None, None, 'paa'
+  ATIVO, INATIVO = 1, 0
+  __ipDest, __ipRemt, __estado = None, None, None
   
   def _init_(self):
     self.__estado = INATIVO
@@ -193,8 +193,12 @@ def novoUsuario(udpSocket):
       
 #Solicita ao servidor que verifique se o login fornecido é válido
 def validarLogin(usuario, senha, udpSocket):
+  #Separa a porta na qual o usuário recebe mensagens de outros usuarios
+  porta = udpSocket.getMinhaPorta()
+  
   if (validarCampoLogin(usuario)) and (validarCampoLogin(senha)):
-    if (enviarMensagem(('LOGIN[=|=]%s[=|=]%s' % (usuario, senha)).encode(), udpSocket).decode()) == 'True':
+    if (enviarMensagem(('LOGIN[=|=]%s[=|=]%s[=|=]%s[=|=]' % (usuario, senha, str(porta))).encode(),
+    udpSocket).decode()) == 'True':
       return True
     else:
       print("Usuário ou senha incorreto(s)!\nSolicite o administrador, caso tenha esquecido.\n")
@@ -223,7 +227,7 @@ def login(udpSocket):
       break
   return usuario
 
-#Captura e trata mensagens enviadas ao usuario
+#Captura e trata mensagens enviadas ao usuario de outras e verificações do servidor
 def interceptarMensagens(estado, porta, ipServidor):
 
   arquivo = open('msg-box.txt', 'a+')
@@ -232,21 +236,21 @@ def interceptarMensagens(estado, porta, ipServidor):
   s.getClientSocket().settimeout(3)
   
   t = threading.currentThread()  
+  #Executa o loop enquanto a thread estiver viva
   while (getattr(t, "do_run", True)):
     try:
       mensagem, remetente = s.getClientSocket().recvfrom(2048)
-      
+      ipRemetente = remetente[0]
       #Recebeu uma verificação de atividade do servidor, envia resposta
-      if(rementente[1] == ipServidor and mensagem.decode() == 'CHECK'):       
-        s.getClientSocket().sendto('OK', (ipServidor, ''))       
-      
+      if(ipRemetente == ipServidor and mensagem.decode() == 'CHECK'):   
+        s.getClientSocket().sendto('OK'.encode(), (ipServidor, 18000))       
       #Usuário está na conversa com o remetente?
       elif(1>20):#if(estado.getEstado()):
         #Se sim, printa a mensagem formatadinha, bonitinha
         '''mostrarMensagem(mensagem, remetente)'''
         pass
       else:
-        print() 
+        print()
         #Se não, salva na caixa de mensagem para mostrar posteriormente
         '''arquivarMensagem(mensagem, remetente)'''
         
@@ -306,7 +310,7 @@ def main():
     try:
       logout(usuario, udpSocket)
     except Exception as e:
-      logging.fatal(e, exc_info=True)
+      print(e)
       pass
     return 0
 
