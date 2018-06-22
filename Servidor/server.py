@@ -35,7 +35,8 @@ def lerArquivoDeConfiguracao():
     texto = arquivo.readlines()
 
     #Obtendo os valores de cada parametro do arquivo de config.
-    porta = texto[0].split(':')[1]
+    porta = texto[0].split(': ')[1]
+    checkPort = texto[1].split(': ')[1]
   
     arquivo.close()
   except IOError: 
@@ -69,10 +70,18 @@ def estaOnline(s, endereco, porta):
   if resposta.decode() != 'OK': return False
   return True
 
+def getCheckPort():
+   arquivo = open('server-setup.txt', 'r')
+   texto = arquivo.readlines()
+   checkPort = texto[1].split(': ')[1].strip()
+   return int(checkPort)
+   
+
 #Realiza uma verificação periodica para detectar quais dos usuários online ainda estão ativos
 def verificacaoDeAtividade():
-  s = Socket(18000)
-  s.getServerSocket().bind(('', 18000))
+  checkPort = getCheckPort()
+  s = Socket(checkPort)
+  s.getServerSocket().bind(('', checkPort))
   s.getServerSocket().settimeout(3)
   arquivo = open('user-status.dbf', 'w+')
   while True:
@@ -95,6 +104,8 @@ def verificacaoDeAtividade():
       
 #Retorna True se o apelido já existe e False se é único
 def verificarApelido(apelido):
+  
+  
   #Não pode retornar valor boolean porque so pode enviar dados em bytes pelo UDP
   return 'False'
 
@@ -173,7 +184,7 @@ def listarOnline(usuario,serverSocket, ipCliente):
         if linha != '' and linha.split(':')[0] != usuario:
           #Insere na variavel de resposta <apelido(usuario)> - <ip> de cada pessoa online
           #resposta = resposta + str('%s - %s\n' % (linha.split(':')[0], linha.split(':')[1]))
-          serverSocket.sendto(('%s - %s\n' % (linha.split(':')[0], linha.split(':')[1])).encode(), (ipCliente))
+          serverSocket.sendto(linha.encode(), (ipCliente))
       
       arquivo.close()
   except IOError:

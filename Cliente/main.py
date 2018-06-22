@@ -102,11 +102,13 @@ class Thread(threading.Thread):
   def stop(self):
     self.running = False
 
+def obterUsuariosOnlines(usuario, udpSocket):
+	mensagem = ('LIST[=|=]%s' % (usuario))
+	return enviarMensagem_(mensagem.encode(), udpSocket)
   
 def listarUsuarios(usuario, udpSocket):
   print ("\tUsuários Online")
-  mensagem = ('LIST[=|=]%s' % (usuario))
-  lista = enviarMensagem_(mensagem.encode(), udpSocket)
+  lista = obterUsuariosOnlines(usuario, udpSocket)
   for i in lista:
     print(i)
   
@@ -137,10 +139,10 @@ def lerArquivoDeConfiguracao():
   return Socket(serverIP[:len(serverIP)-1], int(serverPort[:len(serverPort)-1]), int(port[:len(port)-1]))
     
 #Envia uma mensagem para o servidor e recebe uma resposta
-def enviarMensagem(mensagem, s):
-  clientSocket = s.getClientSocket()
+def enviarMensagem(mensagem, udpSocket):
+  clientSocket = udpSocket.getClientSocket()
   try:
-    clientSocket.sendto(mensagem, (s.getIpServidor(), s.getPortaServidor()))
+    clientSocket.sendto(mensagem, (udpSocket.getIpServidor(), udpSocket.getPortaServidor()))
     resposta, server = clientSocket.recvfrom(4096)
   except socket.timeout:
      print ("TIMEOUT: O servidor não está respondendo. Tente novamente mais tarde!")
@@ -148,11 +150,11 @@ def enviarMensagem(mensagem, s):
   return resposta
 
 #Envia uma mensagem para o servidor e recebe múltiplas respostas
-def enviarMensagem_(mensagem, s):
+def enviarMensagem_(mensagem, udpSocket):
   respostas = []
-  clientSocket = s.getClientSocket()
+  clientSocket = udpSocket.getClientSocket()
   try:
-    clientSocket.sendto(mensagem, (s.getIpServidor(), s.getPortaServidor()))
+    clientSocket.sendto(mensagem, (udpSocket.getIpServidor(), udpSocket.getPortaServidor()))
     while True:
       resposta, server = clientSocket.recvfrom(4096)
       if(resposta.decode() == 'END'): break
@@ -242,8 +244,8 @@ def interceptarMensagens(estado, porta, ipServidor):
       mensagem, remetente = s.getClientSocket().recvfrom(2048)
       ipRemetente = remetente[0]
       #Recebeu uma verificação de atividade do servidor, envia resposta
-      if(ipRemetente == ipServidor and mensagem.decode() == 'CHECK'):   
-        s.getClientSocket().sendto('OK'.encode(), (ipServidor, 18000))       
+      if(mensagem.decode() == 'CHECK'):   
+        s.getClientSocket().sendto('OK'.encode(), (remetente))       
       #Usuário está na conversa com o remetente?
       elif(1>20):#if(estado.getEstado()):
         #Se sim, printa a mensagem formatadinha, bonitinha
@@ -263,13 +265,15 @@ def chat(udpSocket, usuario, estado):
   udpSocket.getClientSocket().settimeout(5)
   data = date.today().strftime('%d/%m/%Y %H:%M')
   
-  guia = "Use os comandos:\nLIST: para ver quem está online\nTALK  <nomeDoUsuario>: para iniciar uma conversa com alguém\nINFO: para ver detalhes da sessão\nHELP: para mostrar este guia de novo\nOFF : para sair do chat"
+  guia = "\nUse os comandos:\nLIST: para ver quem está online\nTALK  <nomeDoUsuario>: para iniciar uma conversa com alguém\nINFO: para ver detalhes da sessão\nHELP: para mostrar este guia de novo\nOFF : para sair do chat"
   info = "\t- Dados da Sessão - \nData: %s\nEndereço do Usuário: %s " % (data, hostIP)
   print ("\nOlá %s. Converse agora com seus amigos!" % (usuario, ) + guia + "\n")
   while True:
     comando = input("\n:")
     if(comando == 'INFO'):
       print (info)
+    elif (comando[:4] == 'TALK'):
+      talk(comando, usuario, udpSocket)
     elif (comando == 'HELP'):
       print (guia)
     elif (comando == 'LIST'):
@@ -278,6 +282,21 @@ def chat(udpSocket, usuario, estado):
       finalizar()
   
    #INSERIR AQUI UM COMANDO PARA LIMPAR A TELA
+
+def talk(comando, usuario, udpSocket):
+   lista = obterUsuariosOnlines(usuario, udpSocket)
+ 
+   try:
+      for i in lista:
+         print(i)
+         i = i.split(':')
+         if (i[0] == comando.split('TALK ')[1]):
+            print (('REQUEST_IP_FROM: %s' % i[1]))
+            enviarMensagem(('REQUEST_IP_FROM[=|=]%s' % i[1]).encode(), udpSocket)
+            break
+      print ("O usuário informado não está online.")
+   except IndexError:
+      print("Você deve fornecer o nome de usário que deseja conversar")
 
 def main():
   try:
@@ -304,6 +323,7 @@ def main():
     sys.exit(-2)
   except KeyboardInterrupt:
     print("Chat finalizado!")
+
   finally:
     chatThread.do_run = False
     chatThread.join()
@@ -313,8 +333,10 @@ def main():
       print(e)
       pass
     return 0
-
+  
 
 if __name__== "__main__":
   main()
   sys.exit()
+
+
