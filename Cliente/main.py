@@ -1,10 +1,11 @@
 #coding: utf-8
 import getpass as g 
-from datetime import date
+import datetime
 import socket
 import sys
 import threading
 import logging
+import os
 
 class Socket:
   __ipServidor, __portaServidor, __clientSocket, __minhaPorta = None, None, None, None
@@ -103,8 +104,8 @@ class Thread(threading.Thread):
     self.running = False
 
 def obterUsuariosOnlines(usuario, udpSocket):
-	mensagem = ('LIST[=|=]%s' % (usuario))
-	return enviarMensagem_(mensagem.encode(), udpSocket)
+    mensagem = ('LIST[=|=]%s' % (usuario))
+    return enviarMensagem_(mensagem.encode(), udpSocket)
   
 def listarUsuarios(usuario, udpSocket):
   print ("\tUsuários Online")
@@ -176,7 +177,7 @@ def novoUsuario(udpSocket):
   while True:
     usuario = input ("Qual é o seu apelido?")
     #Verica no servidor o apelido escolhido
-    if(verificarApelido(usuario, udpSocket) == 'True'):
+    if(verificarApelido(usuario, udpSocket).decode() == 'True'):
       print("Este apelido já está sendo usado por outro usuário!")
     else: break
 
@@ -226,6 +227,7 @@ def login(udpSocket):
         continue
     else: senha = g.getpass("Senha:")
     if (validarLogin(usuario, senha, udpSocket) is True):
+      clear()
       break
   return usuario
 
@@ -258,15 +260,19 @@ def interceptarMensagens(estado, porta, ipServidor):
         
     except socket.timeout:
       pass
-      
+
+def clear():
+  os.system('cls' if os.name == 'nt' else 'clear')
+  
+  
         
 def chat(udpSocket, usuario, estado):
   hostIP = '127.0.0.1' #Na verdade nao precisa disso
   udpSocket.getClientSocket().settimeout(5)
-  data = date.today().strftime('%d/%m/%Y %H:%M')
+  data = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
   
-  guia = "\nUse os comandos:\nLIST: para ver quem está online\nTALK  <nomeDoUsuario>: para iniciar uma conversa com alguém\nINFO: para ver detalhes da sessão\nHELP: para mostrar este guia de novo\nOFF : para sair do chat"
-  info = "\t- Dados da Sessão - \nData: %s\nEndereço do Usuário: %s " % (data, hostIP)
+  guia = "\nUse os comandos:\nLIST: para ver quem está online\nTALK  <nomeDoUsuario>: para iniciar uma conversa com alguém\nINFO: para ver detalhes da sessão\nHELP: para mostrar este guia de novo\nCLEAR: para limpar a tela.\nOFF : para sair do chat"
+  info = "\t- Dados da Sessão - \nNome do Usuario: %s\nData: %s\nEndereço do Usuário: %s\nPorta do Servidor: %s\nEndereço do Servidor: %s\n" % (usuario, data, hostIP, udpSocket.getPortaServidor(), udpSocket.getIpServidor())
   print ("\nOlá %s. Converse agora com seus amigos!" % (usuario, ) + guia + "\n")
   while True:
     comando = input("\n:")
@@ -275,6 +281,9 @@ def chat(udpSocket, usuario, estado):
     elif (comando[:4] == 'TALK'):
       talk(comando, usuario, udpSocket)
     elif (comando == 'HELP'):
+      print (guia)
+    elif (comando == 'CLEAR'):
+      clear()
       print (guia)
     elif (comando == 'LIST'):
       listarUsuarios(usuario, udpSocket)

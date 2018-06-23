@@ -65,8 +65,8 @@ def estaOnline(s, endereco, porta):
     serverSck.sendto('CHECK'.encode(), (endereco, int(porta)))
     resposta, remetente = serverSck.recvfrom(5)
   except Exception as e:
-	  logging.fatal(e, exc_info=True) 
-	  return False
+      print("O cliente não respondeu a checagem") 
+      return False
   if resposta.decode() != 'OK': return False
   return True
 
@@ -104,8 +104,15 @@ def verificacaoDeAtividade():
       
 #Retorna True se o apelido já existe e False se é único
 def verificarApelido(apelido):
+  arquivo = open('user-data.dbf', 'a+')
+  dados = arquivo.readlines()
   
-  
+  if(dados != None):
+    #Percorre o arquivo procurando se o usuário já esta cadastrado
+    for linha in dados:
+      if (apelido == linha.split('[=|=]')[0]):
+        return 'True'
+
   #Não pode retornar valor boolean porque so pode enviar dados em bytes pelo UDP
   return 'False'
 
@@ -115,6 +122,7 @@ def cadastrarUsuario(usuario, senha):
     arquivo = open('user-data.dbf', 'a+')
     if(arquivo.write('%s[=|=]%s[=|=]\n' % (usuario, senha))):
       arquivo.close()
+      print('Usuário %s cadastrado!' % usuario)
       return 'True'
     arquivo.close()
   except IOError:
@@ -218,12 +226,15 @@ def interpretarComando(s):
 
       #Se o comando é para logar
       if(comando == 'LOGIN'):
-        serverSocket.sendto(autenticarUsuario(usuario, senha).encode(), (ipCliente))
-        #Obtem o usuario, ip do cliente e a porta pela qual espera mensagens
-        porta = mensagem.split('[=|=]')[3]
-        logarUsuario(usuario, ipCliente[0], porta)
-        print('Usuario logado:', usuario )
-        #Se o comando é para verificar um apelido
+        isValido = autenticarUsuario(usuario, senha)
+        serverSocket.sendto(isValido.encode(), (ipCliente))
+        
+        if (isValido == 'True'):
+          #Obtem o usuario, ip do cliente e a porta pela qual espera mensagens
+          porta = mensagem.split('[=|=]')[3]
+          logarUsuario(usuario, ipCliente[0], porta)
+          print('Usuario logado:', usuario )
+      #Se o comando é para verificar um apelido
       elif(comando == 'NICK'):
         #Verica se o apelido já existe nos arquivos do servidor e envia a resposta ao cliente
         serverSocket.sendto(verificarApelido(usuario).encode(), (ipCliente))
