@@ -189,7 +189,7 @@ def listarOnline(usuario,serverSocket, ipCliente):
     if(arquivo != None):
       texto = arquivo.readlines()
       for linha in texto:
-        if linha != '' and linha.split(':')[0] != usuario:
+        if linha != '':
           #Insere na variavel de resposta <apelido(usuario)> - <ip> de cada pessoa online
           #resposta = resposta + str('%s - %s\n' % (linha.split(':')[0], linha.split(':')[1]))
           serverSocket.sendto(linha.encode(), (ipCliente))

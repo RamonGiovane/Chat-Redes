@@ -108,10 +108,16 @@ def obterUsuariosOnlines(usuario, udpSocket):
     return enviarMensagem_(mensagem.encode(), udpSocket)
   
 def listarUsuarios(usuario, udpSocket):
-  print ("\tUsuários Online")
   lista = obterUsuariosOnlines(usuario, udpSocket)
+
+  if (lista.__len__() == 1):
+    print("Não há outros usuários online.")
+    return
+
+  print ("\tUsuários Online")
   for i in lista:
-    print(i)
+    if (i.split(':')[0] != usuario):
+      print(i.split(':')[0])
   
 def finalizar():
   print ("Finalizando...")
@@ -142,28 +148,25 @@ def lerArquivoDeConfiguracao():
 #Envia uma mensagem para o servidor e recebe uma resposta
 def enviarMensagem(mensagem, udpSocket):
   clientSocket = udpSocket.getClientSocket()
-  try:
-    clientSocket.sendto(mensagem, (udpSocket.getIpServidor(), udpSocket.getPortaServidor()))
-    resposta, server = clientSocket.recvfrom(4096)
-  except socket.timeout:
-     print ("TIMEOUT: O servidor não está respondendo. Tente novamente mais tarde!")
-     sys.exit()
+
+  clientSocket.sendto(mensagem, (udpSocket.getIpServidor(), udpSocket.getPortaServidor()))
+  resposta, server = clientSocket.recvfrom(4096)
+
   return resposta
 
 #Envia uma mensagem para o servidor e recebe múltiplas respostas
 def enviarMensagem_(mensagem, udpSocket):
+
   respostas = []
   clientSocket = udpSocket.getClientSocket()
-  try:
-    clientSocket.sendto(mensagem, (udpSocket.getIpServidor(), udpSocket.getPortaServidor()))
-    while True:
-      resposta, server = clientSocket.recvfrom(4096)
-      if(resposta.decode() == 'END'): break
-      respostas.append(resposta.decode())
-      
-  except socket.timeout:
-     print ("TIMEOUT: O servidor não está respondendo. Tente novamente mais tarde!")
-     sys.exit()
+
+  clientSocket.sendto(mensagem, (udpSocket.getIpServidor(), udpSocket.getPortaServidor()))
+  while True:
+    clientSocket.settimeout(5)
+    resposta, server = clientSocket.recvfrom(4096)
+    if(resposta.decode() == 'END'): break
+    respostas.append(resposta.decode())
+
   return respostas
 
 #Pergunta ao servidor se o apelido solicitado já existe
@@ -198,7 +201,14 @@ def novoUsuario(udpSocket):
 def validarLogin(usuario, senha, udpSocket):
   #Separa a porta na qual o usuário recebe mensagens de outros usuarios
   porta = udpSocket.getMinhaPorta()
-  
+
+  lista = obterUsuariosOnlines(usuario, udpSocket)
+
+  for i in lista:
+    if (i.split(':')[0] == usuario):
+      print("ERRO: Login simultâneo, este usuário já está logado.")
+      return False
+
   if (validarCampoLogin(usuario)) and (validarCampoLogin(senha)):
     if (enviarMensagem(('LOGIN[=|=]%s[=|=]%s[=|=]%s[=|=]' % (usuario, senha, str(porta))).encode(),
     udpSocket).decode()) == 'True':
@@ -263,8 +273,6 @@ def interceptarMensagens(estado, porta, ipServidor):
 
 def clear():
   os.system('cls' if os.name == 'nt' else 'clear')
-  
-  
         
 def chat(udpSocket, usuario, estado):
   hostIP = '127.0.0.1' #Na verdade nao precisa disso
@@ -294,10 +302,13 @@ def chat(udpSocket, usuario, estado):
 
 def talk(comando, usuario, udpSocket):
    lista = obterUsuariosOnlines(usuario, udpSocket)
- 
+
+   if (lista.__len__() == 0):
+     print("Não há outros usuários disponivéis para conversar.")
+     return
+
    try:
       for i in lista:
-         print(i)
          i = i.split(':')
          if (i[0] == comando.split('TALK ')[1]):
             print (('REQUEST_IP_FROM: %s' % i[1]))
@@ -311,7 +322,7 @@ def main():
   try:
     #Obtendo um objeto Socket que é formado pelos prâmentros do arquivo de configuração
     udpSocket = lerArquivoDeConfiguracao()
-    
+
     #Instancia um objeto Status que será usado no chat
     estado = Status()
     
@@ -324,9 +335,13 @@ def main():
     #checkThread.start()    
     
     #Exibe o login ao  usuario, logo começa o programa de fato
+    usuario = None
     usuario = login(udpSocket)
     chat(udpSocket, usuario, estado)
-  
+
+  except socket.timeout:
+    print("TIMEOUT: O servidor não está respondendo. Tente novamente mais tarde!")
+    sys.exit(-3)
   except ConnectionResetError:
     print("\nSEM CONEXAO:Parece que o servidor está com problemas!\nO programa não pôde prosseguir e foi interrompido.")
     sys.exit(-2)
@@ -337,7 +352,8 @@ def main():
     chatThread.do_run = False
     chatThread.join()
     try:
-      logout(usuario, udpSocket)
+      if (usuario != None):
+        logout(usuario, udpSocket)
     except Exception as e:
       print(e)
       pass
