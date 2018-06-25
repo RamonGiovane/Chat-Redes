@@ -104,7 +104,7 @@ def verificacaoDeAtividade():
       
 #Retorna True se o apelido já existe e False se é único
 def verificarApelido(apelido):
-  arquivo = open('user-data.dbf', 'a+')
+  arquivo = open('user-data.dbf', 'r')
   dados = arquivo.readlines()
   
   if(dados != None):
