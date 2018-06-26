@@ -111,14 +111,19 @@ def listarUsuarios(usuario, udpSocket):
   lista = obterUsuariosOnlines(usuario, udpSocket)
 
   if (lista.__len__() == 1):
-    print("Não há outros usuários online.")
+    print("\nNão há outros usuários online.")
     return
 
   print ("\tUsuários Online")
   for i in lista:
     if (i.split(':')[0] != usuario):
       print(i.split(':')[0])
-  
+      
+def off():
+  fim = input('\nDeseja mesmo ENCERRAR o programa? S/N: ')
+  if(fim == 'S'):
+    finalizar()
+    
 def finalizar():
   print ("Finalizando...")
   sys.exit()
@@ -172,27 +177,32 @@ def enviarMensagem_(mensagem, udpSocket):
 #Pergunta ao servidor se o apelido solicitado já existe
 def verificarApelido(apelido, s):
   comando = ('NICK[=|=]%s' % apelido).encode()
-  return enviarMensagem(comando, s)
+  return enviarMensagem(comando, s).decode()
     
 #Lê os dados de um cadastro de usuário e os envia para o servidor
 def novoUsuario(udpSocket):
-  print ("\t-Cadastrar Usuário-")
+  print ("\n\t-Cadastrar Usuário-")
   while True:
     usuario = input ("Qual é o seu apelido?")
+    #Verica a validade do apelido
+    if(validarUsuario(usuario) == False):
+      print('\nApelido inválido! Tente outro!\nSeu nick deve ter ao menos 3 letras\n')
+    
     #Verica no servidor o apelido escolhido
-    if(verificarApelido(usuario, udpSocket).decode() == 'True'):
-      print("Este apelido já está sendo usado por outro usuário!")
+    elif(verificarApelido(usuario, udpSocket) == 'True'):
+      print("\nEste apelido já está sendo usado por outro usuário!\n")
+    
     else: break
 
   while True:
     while True:
       senha  =  g.getpass("Defina uma senha: ")
       if(len(senha)<5):
-        print("A senha deve possuir no mínimo 5 caracteres")
+        print("\nA senha deve possuir no mínimo 5 caracteres\n")
       else: break
     csenha =  g.getpass("Confirme a senha: ")
     if (senha != csenha):
-      print("As senhas não coincidem\n")
+      print("\nAs senhas não coincidem\n")
     else: 
       cadastrarUsuario(usuario, senha, udpSocket)
       break
@@ -206,21 +216,25 @@ def validarLogin(usuario, senha, udpSocket):
 
   for i in lista:
     if (i.split(':')[0] == usuario):
-      print("ERRO: Login simultâneo, este usuário já está logado.")
+      print("\nERRO: Login simultâneo, este usuário já está logado.")
       return False
 
-  if (validarCampoLogin(usuario)) and (validarCampoLogin(senha)):
+  if (validarUsuario(usuario)) and (validarSenha(senha)):
     if (enviarMensagem(('LOGIN[=|=]%s[=|=]%s[=|=]%s[=|=]' % (usuario, senha, str(porta))).encode(),
     udpSocket).decode()) == 'True':
       return True
     else:
-      print("Usuário ou senha incorreto(s)!\nSolicite o administrador, caso tenha esquecido.\n")
-  else: print ("Usuário ou senha inválido(s)!\n\n")
+      print("\nUsuário ou senha incorreto(s)!\nSolicite o administrador, caso tenha esquecido.\n")
+  else: print ("\nUsuário ou senha inválido(s)!\n\n")
   return False
 
-#Função única que valida requisitos em comum entre usuário e senha, #como tamanho
-def validarCampoLogin(x):
-  if ((len(x) < 5) or ('[=|=]' in x)):
+def validarSenha(senha):
+  if ((len(senha) < 5) or ('[=|=]' in senha)):
+    return False
+  return True
+
+def validarUsuario(usuario):
+  if ((len(usuario) < 3) or ('[=|=]' in usuario) or (usuario == 'NEW') or (usuario == 'LOGIN') or (usuario == 'NICK')):
     return False
   return True
 
@@ -274,18 +288,26 @@ def interceptarMensagens(estado, porta, ipServidor):
 def clear():
   os.system('cls' if os.name == 'nt' else 'clear')
         
-def chat(udpSocket, usuario, estado):
-  hostIP = '127.0.0.1' #Na verdade nao precisa disso
-  udpSocket.getClientSocket().settimeout(5)
+def ajuda():
+  return ('\nUse os comandos:\nLIST: para ver quem está online\nTALK  <nomeDoUsuario>: para iniciar uma conversa '
+  + 'com alguém\nINFO: para ver detalhes da sessão\nHELP: para mostrar este guia de novo\nCLEAR: para limpar a tela.\n'
+  + 'OUT : para fazer logout\nOFF : para sair do programa')
+
+def info(dataLogin, usuario, udpSocket):
+  hostIp = socket.gethostbyname(socket.gethostname())
   data = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+  return "\t- Dados da Sessão - \nNome do Usuario: %s\nData: %s\nLogado desde: %s\nEndereço do Usuário: %s\nPorta do Servidor: %s\nEndereço do Servidor: %s\n" % (usuario, data, dataLogin, hostIp, udpSocket.getPortaServidor(), udpSocket.getIpServidor())
+
+def chat(udpSocket, usuario, estado):
+  udpSocket.getClientSocket().settimeout(5)
   
-  guia = "\nUse os comandos:\nLIST: para ver quem está online\nTALK  <nomeDoUsuario>: para iniciar uma conversa com alguém\nINFO: para ver detalhes da sessão\nHELP: para mostrar este guia de novo\nCLEAR: para limpar a tela.\nOFF : para sair do chat"
-  info = "\t- Dados da Sessão - \nNome do Usuario: %s\nData: %s\nEndereço do Usuário: %s\nPorta do Servidor: %s\nEndereço do Servidor: %s\n" % (usuario, data, hostIP, udpSocket.getPortaServidor(), udpSocket.getIpServidor())
+  dataLogin = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+  guia = ajuda()
   print ("\nOlá %s. Converse agora com seus amigos!" % (usuario, ) + guia + "\n")
   while True:
     comando = input("\n:")
     if(comando == 'INFO'):
-      print (info)
+      print (info(dataLogin, usuario, udpSocket))
     elif (comando[:4] == 'TALK'):
       talk(comando, usuario, udpSocket)
     elif (comando == 'HELP'):
@@ -296,9 +318,14 @@ def chat(udpSocket, usuario, estado):
     elif (comando == 'LIST'):
       listarUsuarios(usuario, udpSocket)
     elif (comando == 'OFF'):
-      finalizar()
+      off()
+    elif(comando == 'OUT'):
+      if(input('\nDeseja mesmo SAIR para a tela de login? S/N: ') == 'S'):
+        logout(usuario, udpSocket)
+        clear()
+        return True
+  return False
   
-   #INSERIR AQUI UM COMANDO PARA LIMPAR A TELA
 
 def talk(comando, usuario, udpSocket):
    lista = obterUsuariosOnlines(usuario, udpSocket)
@@ -314,9 +341,9 @@ def talk(comando, usuario, udpSocket):
             print (('REQUEST_IP_FROM: %s' % i[1]))
             enviarMensagem(('REQUEST_IP_FROM[=|=]%s' % i[1]).encode(), udpSocket)
             break
-      print ("O usuário informado não está online.")
+      print ("\nO usuário informado não está online.")
    except IndexError:
-      print("Você deve fornecer o nome de usário que deseja conversar")
+      print("\nVocê deve fornecer o nome de usário que deseja conversar")
 
 def main():
   try:
@@ -335,9 +362,11 @@ def main():
     #checkThread.start()    
     
     #Exibe o login ao  usuario, logo começa o programa de fato
-    usuario = None
-    usuario = login(udpSocket)
-    chat(udpSocket, usuario, estado)
+    while True:
+      usuario = None
+      usuario = login(udpSocket)
+      if(chat(udpSocket, usuario, estado) == False):
+        break
 
   except socket.timeout:
     print("TIMEOUT: O servidor não está respondendo. Tente novamente mais tarde!")
@@ -346,7 +375,7 @@ def main():
     print("\nSEM CONEXAO:Parece que o servidor está com problemas!\nO programa não pôde prosseguir e foi interrompido.")
     sys.exit(-2)
   except KeyboardInterrupt:
-    print("Chat finalizado!")
+    print("\nFinalizando...")
 
   finally:
     chatThread.do_run = False
@@ -357,6 +386,8 @@ def main():
     except Exception as e:
       print(e)
       pass
+    
+    input('Pressione ENTER para continuar...')  
     return 0
   
 

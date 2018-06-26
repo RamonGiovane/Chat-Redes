@@ -4,7 +4,6 @@ import threading
 import logging
 import sys
 import time
-import re
 
 class Socket:
   __portaServidor, __serverSocket = None, None
