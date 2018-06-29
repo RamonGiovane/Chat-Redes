@@ -16,7 +16,7 @@ class Socket:
     if (ipServidor, portaServidor != None, None):
      self.__ipServidor = ipServidor
      self.__portaServidor = portaServidor
-    
+      
     self.__minhaPorta = minhaPorta
     self.__clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -54,10 +54,11 @@ class Status():
   #Status ativo = usuário está com o chat aberto pronto para receber mensagens diretamente
   #Status inativo = usuário não está com a conversa aberta para receber mensagens
   ATIVO, INATIVO = 1, 0
-  __ipDest, __ipRemt, __estado = None, None, None
+  __ipDest, __ipRemt, __estado, __logado = None, None, None, False
   
   def _init_(self):
     self.__estado = INATIVO
+    self.__logado = False
     
   def getIpDest(self, ipDest):
     self.__ipDest = ipDest
@@ -82,6 +83,12 @@ class Status():
     
   def igetEstado(self):
     return self.__estado
+
+  def setLogado(self, logado):
+    self.__logado = logado
+    
+  def igetEstado(self):
+    return self.__logado
 
 def obterUsuariosOnlines(usuario, udpSocket):
     mensagem = ('LIST[=|=]%s' % (usuario))
@@ -271,7 +278,7 @@ def lerMensagensDaCaixa(texto, usuario):
     return
   i = index
   while(True):
-    if("[=|=]END" in texto[i]):      
+    if(end in texto[i]):      
       break
     if(texto[i] != '' and texto[i] != '\n'):
       print("\n%s: %s" % (usuario, texto[i]))
@@ -362,7 +369,7 @@ def interceptarMensagens(estado, porta, ipServidor, texto):
         mensagem = mensagem.decode()
         if(mensagem == 'CHECK'):   
           s.getClientSocket().sendto('OK'.encode(), (remetente))
-               
+              
         #Usuário está na conversa com o remetente?
         elif(estado.getEstado(remetente[0]) == 1):
           #Se sim, printa a mensagem devidamente formatada
@@ -373,6 +380,7 @@ def interceptarMensagens(estado, porta, ipServidor, texto):
           if (estado.igetEstado() != 1 and lastRemetente != mensagem.split('[=|=]')[1]):
             print('Você tem novas mensagens de %s' % mensagem.split('[=|=]')[1])
             lastRemetente = mensagem.split('[=|=]')[1]
+         
          #Se não, salva na caixa de mensagem para mostrar posteriormente
           if(mensagem.split('[=|=]')[0] != 'START_CHAT'): 
             armazenarMensagens(texto, mensagem.split('[=|=]')[1], mensagem.split('[=|=]')[3])
@@ -457,6 +465,8 @@ def abrirConversa(texto, estado, udpSocket, usuario, destino, ipDestino, portaDe
   lerMensagensDaCaixa(texto, destino)
   while True:
     mensagem = input('\n:')
+    if('[=|=]' in mensagem):
+      mensagem = mensagem.replace('[=|=]', ' ')
     
     if (mensagem == ''): 
       continue
@@ -541,7 +551,7 @@ def main():
     estado = Status()
     
     #Le o arquivo da caixa de mensagens
-    caixaMensagem = obterCaixaDeMensagens(False)
+    caixaMensagem = obterCaixaDeMensagens(True)
     
     #Cria uma thread que capta mensagens endereçadas para o cliente
     chatThread = threading.Thread(target=interceptarMensagens, args=(estado, udpSocket.getMinhaPorta(), udpSocket.getIpServidor(), caixaMensagem))
@@ -573,10 +583,10 @@ def main():
     try:
       if (usuario != None):
         logout(usuario, udpSocket)
-      os.remove('msg-box.dbf')
+        apagarMensagens(obterCaixaDeMensagens(False), usuario)
       udpSocket.fecharSocket()
     except Exception as e:
-      print(e)
+      #print(e)
       pass
     
     input('Pressione ENTER para continuar...')  
